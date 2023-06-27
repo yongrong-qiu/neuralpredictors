@@ -391,12 +391,12 @@ class Factorized3dCore(Core3d, nn.Module):
         layer["conv_temporal"] = nn.Conv3d(
             self.hidden_channels[0],
             self.hidden_channels[0],
-            kernel_size=(temporal_input_kernel, 1, 1),
+            kernel_size=(self.temporal_input_kernel, 1, 1),
             bias=self.bias,
             dilation=(self.temporal_dilation, 1, 1),
         )
 
-        self.add_bn_layer(layer=layer, hidden_channels=hidden_channels)
+        self.add_bn_layer(layer=layer, hidden_channels=self.hidden_channels[0])
 
         if layers > 1 or final_nonlin:
             if hidden_nonlinearities == "adaptive_elu":
@@ -419,13 +419,13 @@ class Factorized3dCore(Core3d, nn.Module):
                 else 0,
             )
             layer[f"conv_temporal_{l+1}"] = nn.Conv3d(
-                self.hidden_channels[l],
-                self.hidden_channels[l],
+                self.hidden_channels[l+1], 
+                self.hidden_channels[l+1],
                 kernel_size=(self.temporal_hidden_kernel[l], 1, 1),
                 bias=self.bias,
             )
 
-            self.add_bn_layer(layer=layer, hidden_channels=hidden_channels)
+            self.add_bn_layer(layer=layer, hidden_channels=self.hidden_channels[l+1])
 
             if final_nonlin or l < self.layers:
                 if hidden_nonlinearities == "adaptive_elu":
