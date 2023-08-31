@@ -368,6 +368,9 @@ class NeuroNormalizer(MovieTransform, StaticTransform, Invertible):
 
         self._inputs_mean = data.statistics[in_name][stats_source]["mean"][()] if inputs_mean is None else inputs_mean
         self._inputs_std = data.statistics[in_name][stats_source]["std"][()] if inputs_mean is None else inputs_std
+        # if self._inputs_mean.ndim == 3: # shape (height, width, number_of_frames)
+        #     self._inputs_mean = np.nanmean(self._inputs_mean)
+        #     self._inputs_std = np.nanmean(self._inputs_std)
 
         s = np.array(data.statistics[out_name][stats_source]["std"])
         if s.ndim == 2:  # shape (number_of_neurons, number_of_frames)
