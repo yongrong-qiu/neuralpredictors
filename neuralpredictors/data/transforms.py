@@ -368,9 +368,9 @@ class NeuroNormalizer(MovieTransform, StaticTransform, Invertible):
 
         self._inputs_mean = data.statistics[in_name][stats_source]["mean"][()] if inputs_mean is None else inputs_mean
         self._inputs_std = data.statistics[in_name][stats_source]["std"][()] if inputs_mean is None else inputs_std
-        # if self._inputs_mean.ndim == 3: # shape (height, width, number_of_frames)
-        #     self._inputs_mean = np.nanmean(self._inputs_mean)
-        #     self._inputs_std = np.nanmean(self._inputs_std)
+#         if self._inputs_mean.ndim == 3: # shape (height, width, number_of_frames)
+#             self._inputs_mean = np.nanmean(self._inputs_mean)
+#             self._inputs_std = np.nanmean(self._inputs_std)
 
         s = np.array(data.statistics[out_name][stats_source]["std"])
         if s.ndim == 2:  # shape (number_of_neurons, number_of_frames)
@@ -403,14 +403,22 @@ class NeuroNormalizer(MovieTransform, StaticTransform, Invertible):
         if eye_name in data.data_keys:
             self._eye_mean = np.array(data.statistics[eye_name][stats_source]["mean"])
             self._eye_std = np.array(data.statistics[eye_name][stats_source]["std"])
+#             if self._eye_mean.ndim == 2: # shape (2, number_of_frames)
+#                 self._eye_mean = np.nanmean(self._eye_mean, axis=1, keepdims=True)
+#                 self._eye_std = np.nanmean(self._eye_std, axis=1, keepdims=True)
             transforms[eye_name] = lambda x: (x - self._eye_mean) / self._eye_std
             itransforms[eye_name] = lambda x: x * self._eye_std + self._eye_mean
 
         if "behavior" in data.data_keys:
             s = np.array(data.statistics["behavior"][stats_source]["std"])
+#             if s.ndim == 2:  # shape (2, number_of_frames)
+#                 s = np.nanmean(s, axis=1, keepdims=True)
 
+            behavior_mean = np.array(data.statistics["behavior"][stats_source]["mean"])
+#             if behavior_mean.ndim == 2:  # shape (2, number_of_frames)
+#                 behavior_mean = np.nanmean(behavior_mean, axis=1, keepdims=True)
             self.behavior_mean = (
-                0 if not subtract_behavior_mean else np.array(data.statistics["behavior"][stats_source]["mean"])
+                0 if not subtract_behavior_mean else behavior_mean
             )
             self._behavior_precision = 1 / s
             # -- behavior
