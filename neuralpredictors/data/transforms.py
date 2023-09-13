@@ -373,8 +373,8 @@ class NeuroNormalizer(MovieTransform, StaticTransform, Invertible):
 #             self._inputs_std = np.nanmean(self._inputs_std)
 
         s = np.array(data.statistics[out_name][stats_source]["std"])
-        if s.ndim == 2:  # shape (number_of_neurons, number_of_frames)
-            s = np.nanmean(s, axis=1, keepdims=True)
+        # if s.ndim == 2:  # shape (number_of_neurons, number_of_frames)
+        #     s = np.nanmean(s, axis=1, keepdims=True)
 
         # TODO: consider other baselines
         threshold = 0.01 * np.nanmean(s)
