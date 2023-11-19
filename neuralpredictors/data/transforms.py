@@ -369,7 +369,7 @@ class NeuroNormalizer(MovieTransform, StaticTransform, Invertible):
         self._inputs_mean = data.statistics[in_name][stats_source]["mean"][()] if inputs_mean is None else inputs_mean
         self._inputs_std = data.statistics[in_name][stats_source]["std"][()] if inputs_mean is None else inputs_std
 
-        s = np.array(data.statistics[out_name][stats_source]["std"])
+        s = np.array(data.statistics[out_name][stats_source]["mean"])
 
         # TODO: consider other baselines
         threshold = 0.01 * np.nanmean(s)
