@@ -376,6 +376,7 @@ class NeuroNormalizer(MovieTransform, StaticTransform, Invertible):
         idx = s > threshold
         self._response_precision = np.ones_like(s) / threshold
         self._response_precision[idx] = 1 / s[idx]
+        self._response_min=np.array(data.statistics[out_name][stats_source]["min"])
         transforms, itransforms = {}, {}
 
         # -- inputs
@@ -383,8 +384,8 @@ class NeuroNormalizer(MovieTransform, StaticTransform, Invertible):
         itransforms[in_name] = lambda x: x * self._inputs_std + self._inputs_mean
 
         # -- responses
-        transforms[out_name] = lambda x: x * self._response_precision
-        itransforms[out_name] = lambda x: x / self._response_precision
+        transforms[out_name] = lambda x: (x - self._response_min) * self._response_precision
+        itransforms[out_name] = lambda x: x / self._response_precision + self._response_min
 
         # -- behavior
         transforms["behavior"] = lambda x: x
