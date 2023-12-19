@@ -246,6 +246,7 @@ class NRandomSubSequenceDataset(Dataset):
         num_random_subsequence: number of subsequences sampled from each original_dat item
         subsequence_length: the length of each subsequence
         sequence_length: full sequence length of a training item from original_dat
+        random_start: array, start positions at each original_dat item for random sampling
         seed: random seed
     """
 
@@ -255,6 +256,7 @@ class NRandomSubSequenceDataset(Dataset):
         num_random_subsequence=10,
         subsequence_length=100,
         sequence_length=300,
+        random_start=None,
         seed=10,
     ):
         new_tiers = []  # list, tiers for each item in new dataset
@@ -272,10 +274,16 @@ class NRandomSubSequenceDataset(Dataset):
         self.original_dat = original_dat
         self.new_tiers = new_tiers
         self.new_inds = new_inds
-        np.random.seed(seed)
-        self.random_start = np.random.randint(
-            low=0, high=sequence_length - subsequence_length, size=num_random_subsequence
-        )  # array, start positions at each original_dat item for random sampling
+        if random_start is None:
+            np.random.seed(seed)
+            self.random_start = np.random.randint(
+                low=0, high=sequence_length - subsequence_length, size=num_random_subsequence
+            )
+        else:  # manually specify the start positions
+            assert (
+                len(random_start) == num_random_subsequence
+            ), f"Number of start positions {len(random_start)} != number of subsequence {num_random_subsequence}"
+            self.random_start = random_start
         self.num4rand = len(self.random_start)
         self.random_end = self.random_start + subsequence_length
 
