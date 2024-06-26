@@ -272,6 +272,8 @@ class Factorized3dCore(Core3d, nn.Module):
         laplace_padding=None,
         input_regularizer="LaplaceL2norm",
         cuda=False,
+        groups=1,
+        skip_connection=False,
         spatial_dilation=1,
         temporal_dilation=1,
         hidden_spatial_dilation=1,
@@ -309,6 +311,10 @@ class Factorized3dCore(Core3d, nn.Module):
         :param input_regularizer: specifies what kind of spatial regularized is applied. Must match one of the
                                   regularizers in neuralpredictors.regularizers
         :param cuda:
+        :param groups: groups in conv3d for hidden layers.
+        :param skip_connection: bool, default: False. If True, residual connections between hidden features will be applied.
+                                To use residual connection, padding would be requred.
+        :groups
         """
         super().__init__()
 
@@ -345,6 +351,8 @@ class Factorized3dCore(Core3d, nn.Module):
             "relu": torch.nn.ReLU,
             "adaptive_elu": AdaptiveELU,
         }
+        self.groups = groups
+        self.skip_connection = skip_connection
 
         self.hidden_channels = check_hyperparam_for_layers(hidden_channels, self.layers)
         self.hidden_temporal_dilation = check_hyperparam_for_layers(hidden_temporal_dilation, self.layers - 1)
@@ -408,6 +416,7 @@ class Factorized3dCore(Core3d, nn.Module):
                 padding=(0, self.spatial_hidden_kernel[l][0] // 2, self.spatial_hidden_kernel[l][1] // 2)
                 if self.padding
                 else 0,
+                groups=self.groups,
             )
             layer[f"conv_temporal_{l+1}"] = nn.Conv3d(
                 self.hidden_channels[l + 1],
@@ -415,6 +424,7 @@ class Factorized3dCore(Core3d, nn.Module):
                 kernel_size=(self.temporal_hidden_kernel[l], 1, 1),
                 bias=self.bias,
                 dilation=(self.hidden_temporal_dilation[l], 1, 1),
+                groups=self.groups,
             )
 
             self.add_bn_layer(layer=layer, hidden_channels=hidden_channels[l + 1])
@@ -429,8 +439,11 @@ class Factorized3dCore(Core3d, nn.Module):
         self.initialize(cuda=cuda)
 
     def forward(self, x):
-        for features in self.features:
-            x = features(x)
+        for ii,features in enumerate(self.features):
+            if ii>0 and self.skip_connection==True:
+                x = features(x) + x
+            else:
+                x = features(x)
         return x
 
     def laplace_spatial(self):
