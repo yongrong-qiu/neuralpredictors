@@ -442,8 +442,17 @@ class Factorized3dCore(Core3d, nn.Module):
 
     def forward(self, x):
         for ii,features in enumerate(self.features):
-            if ii>0 and self.skip_connection==True:
+            if ii==0:
+                # x.shape: (1,3,299,36,64)
+                x = features(x)
+            elif ii>0 and self.skip_connection and self.padding:
                 x = features(x) + x
+            elif ii>0 and self.skip_connection and self.padding==False:
+                # Currently only for the case with dilation=1
+                tt = self.temporal_hidden_kernel[ii-1] // 2
+                hh = self.spatial_hidden_kernel[ii-1][0] // 2
+                ww = self.spatial_hidden_kernel[ii-1][1] // 2
+                x = features(x) + x[:, :, tt:-tt, hh:-hh, ww:-ww]
             else:
                 x = features(x)
         return x
