@@ -278,6 +278,13 @@ class Factorized3dCore(Core3d, nn.Module):
         temporal_dilation=1,
         hidden_spatial_dilation=1,
         hidden_temporal_dilation=1,
+        grumodulator=False,
+        gru_hidden_size=64, 
+        gru_num_layers=1, 
+        gru_h0_train=False, 
+        gru_dropout=0.0, 
+        gru_bidirectional=False,
+
     ):
         """
         Core3d, similar to Basic3dCore but the convolution is separated into first spatial and then temporal.
@@ -353,6 +360,16 @@ class Factorized3dCore(Core3d, nn.Module):
         }
         self.groups = groups
         self.skip_connection = skip_connection
+
+        if grumodulator:
+            self.GRUModulator = GRUModulator(
+                input_size=2, 
+                hidden_size=gru_hidden_size, 
+                num_layers=gru_num_layers, 
+                h0_train=gru_h0_train, 
+                dropout=gru_dropout,
+                bidirectional=gru_bidirectional,
+                )
 
         self.hidden_channels = check_hyperparam_for_layers(hidden_channels, self.layers)
         self.hidden_temporal_dilation = check_hyperparam_for_layers(hidden_temporal_dilation, self.layers - 1)
@@ -443,8 +460,14 @@ class Factorized3dCore(Core3d, nn.Module):
     def forward(self, x):
         for ii,features in enumerate(self.features):
             if ii==0:
-                # x.shape: (1,3,299,36,64)
-                x = features(x)
+                # x.shape: (batch_size, 3, 299, 36, 64)
+                # x1.shape: (batch_size, 1, 299, 36, 64), x2.shape: (batch_size, 299, 2)
+                x1 = x[:, 0, :, :, :].unsqueeze(1) 
+                x2 = x[:, 1:, :, 0, 0].transpose(1,2)
+                x1 = features(x1)
+                x2 = self.GRUModulator(x2)[:, -x1.shape[2]:, :] # shape: (batch_size, depth, DD∗gru_hidden_size)
+                x2 = x2.transpose(1,2).unsqueeze(-1).unsqueeze(-1) # shape: (batch_size, depth, DD∗gru_hidden_size, 1, 1)
+                x = x1 + x2
             elif ii>0 and self.skip_connection and self.padding:
                 x = features(x) + x
             elif ii>0 and self.skip_connection and self.padding==False:
@@ -487,3 +510,31 @@ class Factorized3dCore(Core3d, nn.Module):
                     layer["bias"] = Bias3DLayer(hidden_channels)
                 elif self.batch_norm_scale:
                     layer["scale"] = Scale3DLayer(hidden_channels)
+
+
+class GRUModulator(nn.Module):
+    """
+    GRU modulator for the behavior signals
+    """
+    def __init__(self, input_size, hidden_size, num_layers, h0_train=False, dropout=0.0, bidirectional=False):
+        super().__init__()
+        self.num_layers = num_layers
+        self.hidden_size = hidden_size
+        self.gru = nn.GRU(input_size, hidden_size, num_layers, batch_first=True, dropout=dropout, bidirectional=bidirectional)
+        self.DD = 2 if bidirectional else 1
+        
+        if h0_train:
+            self.h0 = nn.Parameter(torch.zeros(1, 1, self.hidden_size))
+        else:
+            self.register_buffer('h0', torch.zeros(1, 1, self.hidden_size))
+        
+    def forward(self, x):
+        # h0 shape: (DD∗num_layers, batch_size, hidden_size)
+        h0 = self.h0.expand(self.DD*self.num_layers, x.size(0), self.hidden_size).contiguous()
+        
+        # Forward propagate RNN
+        # -> x needs to be: (batch_size, seq_length, input_size)
+        # out shape (batch_size, seq_length, DD∗hidden_size​)
+        out, _ = self.gru(x, h0)
+
+        return out
