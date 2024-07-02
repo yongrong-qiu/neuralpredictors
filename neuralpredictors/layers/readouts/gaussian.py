@@ -389,7 +389,7 @@ class FullGaussian2d(Readout):
         else:
             return 0
 
-    def adaptive_l1_lognorm(self, reduction="sum", average=None):
+    def adaptive_feature_l1_lognorm(self, reduction="sum", average=None):
         if self._original_features:
             features = self.adaptive.abs() * self.features
             return self.apply_reduction(features.abs(), reduction=reduction, average=average)
