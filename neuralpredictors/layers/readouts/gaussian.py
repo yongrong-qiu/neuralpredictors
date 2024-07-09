@@ -291,7 +291,7 @@ class FullGaussian2d(Readout):
         if self.regularizer_type == "adaptive_log_norm":
             self.gamma_sigma = gamma_sigma
             self.adaptive = torch.nn.Parameter(torch.normal(mean=torch.ones(1, outdims), std=torch.ones(1, outdims)))
-        if self.regularizer_type != "adaptive_log_norm" and self.regularizer_type != "l1":
+        elif  self.regularizer_type != "l1":
             raise ValueError(f"regularizer_type should be 'l1' or 'adaptive_log_norm' but got {self.regularizer_type}")
 
         if init_mu_range > 1.0 or init_mu_range <= 0.0 or init_sigma <= 0.0:
