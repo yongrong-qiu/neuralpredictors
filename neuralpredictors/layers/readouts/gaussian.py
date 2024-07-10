@@ -277,6 +277,8 @@ class FullGaussian2d(Readout):
         feature_reg_weight=None,
         gamma_readout=None,  # depricated, use feature_reg_weight instead
         return_weighted_features=False,
+        regularizer_type="l1",
+        gamma_sigma=0.1,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -284,6 +286,15 @@ class FullGaussian2d(Readout):
         self.mean_activity = mean_activity
         # determines whether the Gaussian is isotropic or not
         self.gauss_type = gauss_type
+        self._regularizer_type = regularizer_type
+
+        if self._regularizer_type == "adaptive_log_norm":
+            self.gamma_sigma = gamma_sigma
+            self.adaptive_neuron_reg_coefs = torch.nn.Parameter(
+                torch.normal(mean=torch.ones(1, outdims), std=torch.ones(1, outdims))
+            )
+        elif self._regularizer_type != "l1":
+            raise ValueError(f"regularizer_type should be 'l1' or 'adaptive_log_norm' but got {self._regularizer_type}")
 
         if init_mu_range > 1.0 or init_mu_range <= 0.0 or init_sigma <= 0.0:
             raise ValueError("either init_mu_range doesn't belong to [0.0, 1.0] or init_sigma_range is non-positive")
@@ -379,6 +390,26 @@ class FullGaussian2d(Readout):
             return self.apply_reduction(self.features.abs(), reduction=reduction, average=average)
         else:
             return 0
+
+    def adaptive_feature_l1_lognorm(self, reduction="sum", average=None):
+        if self._original_features:
+            features = self.adaptive_neuron_reg_coefs.abs() * self.features
+            features_regularization = (
+                self.apply_reduction(features.abs(), reduction=reduction, average=average) * self.feature_reg_weight
+            )
+            # adaptive_neuron_reg_coefs (betas) are supposted to be from lognorm distribution
+            coef_prior = 1 / (self.gamma_sigma**2) * ((torch.log(self.adaptive_neuron_reg_coefs.abs()) ** 2).sum())
+            return regularization_loss + coef_prior
+        else:
+            return 0
+
+    def regularizer(self, reduction="sum", average=None):
+        if self._regularizer_type == "l1":
+            return self.feature_l1(reduction=reduction, average=average) * self.feature_reg_weight
+        elif self._regularizer_type == "adaptive_log_norm":
+            return self.adaptive_feature_l1_lognorm(reduction=reduction, average=average)
+        else:
+            raise NotImplementedError(f"Regularizer_type {self._regularizer_type} is not implemented")
 
     def regularizer(self, reduction="sum", average=None):
         return self.feature_l1(reduction=reduction, average=average) * self.feature_reg_weight
