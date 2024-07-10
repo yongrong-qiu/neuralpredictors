@@ -408,8 +408,10 @@ class FullGaussian2d(Readout):
     def regularizer(self, reduction="sum", average=None):
         if self._regularizer_type == "l1":
             return self.feature_l1(reduction=reduction, average=average) * self.feature_reg_weight
-        else:
+        elif self._regularizer_type == "adaptive_log_norm":
             return self.adaptive_feature_l1_lognorm(reduction=reduction, average=average)
+        else:
+            raise NotImplementedError(f"Regularizer_type {self._regularizer_type} is not implemented")
 
     def regularizer(self, reduction="sum", average=None):
         return self.feature_l1(reduction=reduction, average=average) * self.feature_reg_weight
