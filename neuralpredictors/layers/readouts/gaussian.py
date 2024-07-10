@@ -295,7 +295,7 @@ class FullGaussian2d(Readout):
             )
         elif self._regularizer_type != "l1":
             raise ValueError(
-                f"_regularizer_type should be 'l1' or 'adaptive_log_norm' but got {self._regularizer_type}"
+                f"regularizer_type should be 'l1' or 'adaptive_log_norm' but got {self._regularizer_type}"
             )
 
         if init_mu_range > 1.0 or init_mu_range <= 0.0 or init_sigma <= 0.0:
