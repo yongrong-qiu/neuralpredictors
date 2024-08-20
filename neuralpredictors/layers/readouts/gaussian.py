@@ -279,7 +279,7 @@ class FullGaussian2d(Readout):
         gamma_readout=None,  # depricated, use feature_reg_weight instead
         return_weighted_features=False,
         feature_latent_flag=True,
-        feature_latent_dim=3,
+        feature_latent_dim=2,
         **kwargs,
     ):
 
