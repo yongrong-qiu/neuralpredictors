@@ -255,6 +255,8 @@ class FullGaussian2d(Readout):
         source_grid (numpy.array):
                 Source grid for the grid_mean_predictor.
                 Needs to be of size neurons x grid_mean_predictor[input_dimensions]
+        feature_latent_flag: if True, then use feature_latents (low dimensions, usually 2 or 3) and map them to the feature weights for Gaussian readouts
+        feature_latent_dim: dimensionality of feature latents
 
     """
 
@@ -276,6 +278,8 @@ class FullGaussian2d(Readout):
         feature_reg_weight=None,
         gamma_readout=None,  # depricated, use feature_reg_weight instead
         return_weighted_features=False,
+        feature_latent_flag=True,
+        feature_latent_dim=2,
         **kwargs,
     ):
 
@@ -289,8 +293,8 @@ class FullGaussian2d(Readout):
             raise ValueError("either init_mu_range doesn't belong to [0.0, 1.0] or init_sigma_range is non-positive")
 
         # store statistics about the images and neurons
-        self.in_shape = in_shape
-        self.outdims = outdims
+        self.in_shape = in_shape  # tuple(channel, width, height)
+        self.outdims = outdims  # number_of_neurons
 
         # sample a different location per example
         self.batch_sample = batch_sample
@@ -324,6 +328,10 @@ class FullGaussian2d(Readout):
         self.init_sigma = init_sigma
         self.sigma = Parameter(torch.Tensor(*self.sigma_shape))  # standard deviation for gaussian for each neuron
 
+        # TODO: take care of the condition of using shared_features
+        self.feature_latent_flag = feature_latent_flag
+        self.feature_latent_dim = feature_latent_dim
+
         self.initialize_features(**(shared_features or {}))
 
         if bias:
@@ -349,6 +357,8 @@ class FullGaussian2d(Readout):
     def features(self):
         if self._shared_features:
             return self.scales * self._features[..., self.feature_sharing_index]
+        elif self.feature_latent_flag:
+            return self.feature_mlp(self.feature_latent).permute(1, 0).unsqueeze(0).unsqueeze(2)
         else:
             return self._features
 
@@ -464,7 +474,10 @@ class FullGaussian2d(Readout):
             self.sigma.data.fill_(self.init_sigma)
         else:
             self.sigma.data.uniform_(-self.init_sigma, self.init_sigma)
-        self._features.data.fill_(1 / self.in_shape[0])
+        if self.feature_latent_flag:
+            self.feature_latent.data.fill_(1.0)
+        else:
+            self._features.data.fill_(1 / self.in_shape[0])
         if self._shared_features:
             self.scales.data.fill_(1.0)
         if self.bias is not None:
@@ -500,9 +513,13 @@ class FullGaussian2d(Readout):
             self.register_buffer("feature_sharing_index", torch.from_numpy(sharing_idx))
             self._shared_features = True
         else:
-            self._features = Parameter(
-                torch.Tensor(1, c, 1, self.outdims)
-            )  # feature weights for each channel of the core
+            if self.feature_latent_flag:
+                self.feature_latent = Parameter(torch.Tensor(self.outdims, self.feature_latent_dim))
+                self.feature_mlp = nn.Linear(self.feature_latent_dim, c)
+            else:
+                self._features = Parameter(
+                    torch.Tensor(1, c, 1, self.outdims)
+                )  # feature weights for each channel of the core
             self._shared_features = False
 
     def initialize_shared_grid(self, match_ids=None, shared_grid=None):
@@ -547,13 +564,13 @@ class FullGaussian2d(Readout):
         Returns:
             y: neuronal activity
         """
-        N, c, w, h = x.size()
+        N, c, w, h = x.size()  # N: number of frames along temporal axis, c: channel number
         c_in, w_in, h_in = self.in_shape
         if (c_in, w_in, h_in) != (c, w, h):
             warnings.warn("the specified feature map dimension is not the readout's expected input dimension")
-        feat = self.features.view(1, c, self.outdims)
+        feat = self.features.view(1, c, self.outdims)  # self.features.shape: (1, c, 1, number_of_neurons)
         bias = self.bias
-        outdims = self.outdims
+        outdims = self.outdims  # number of neurons
 
         if self.batch_sample:
             # sample the grid_locations separately per image per batch
@@ -575,7 +592,10 @@ class FullGaussian2d(Readout):
         if shift is not None:
             grid = grid + shift[:, None, None, :]
 
+        # gird.shape: (N, number_of_neurons, 1, 2)
         y = F.grid_sample(x, grid, align_corners=self.align_corners)
+        # y.shape: (N, c, number_of_neurons, 1), feat.shape: (1, c, number_of_neurons)
+        # (y.squeeze(-1) * feat).shape: (N, c, number_of_neurons)
         y = (y.squeeze(-1) * feat).sum(1).view(N, outdims)
 
         if self.bias is not None:
