@@ -279,7 +279,7 @@ class FullGaussian2d(Readout):
         gamma_readout=None,  # depricated, use feature_reg_weight instead
         return_weighted_features=False,
         feature_latent_flag=True,
-        feature_latent_dim=2,
+        feature_latent_dim=3,
         **kwargs,
     ):
 
@@ -475,7 +475,7 @@ class FullGaussian2d(Readout):
         else:
             self.sigma.data.uniform_(-self.init_sigma, self.init_sigma)
         if self.feature_latent_flag:
-            self.feature_latent.data.uniform_(-1, 1)
+            self.feature_latent.data.fill_(0.0)
         else:
             self._features.data.fill_(1 / self.in_shape[0])
         if self._shared_features:
