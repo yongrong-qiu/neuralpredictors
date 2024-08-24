@@ -278,8 +278,9 @@ class FullGaussian2d(Readout):
         feature_reg_weight=None,
         gamma_readout=None,  # depricated, use feature_reg_weight instead
         return_weighted_features=False,
-        feature_latent_flag=True,
+        feature_latent_flag=False,
         feature_latent_dim=2,
+        feature_latent_hidden=128,
         **kwargs,
     ):
 
@@ -330,7 +331,9 @@ class FullGaussian2d(Readout):
 
         # TODO: take care of the condition of using shared_features
         self.feature_latent_flag = feature_latent_flag
-        self.feature_latent_dim = feature_latent_dim
+        if self.feature_latent_flag:
+            self.feature_latent_dim = feature_latent_dim
+            self.feature_latent_hidden = feature_latent_hidden
 
         self.initialize_features(**(shared_features or {}))
 
@@ -515,7 +518,12 @@ class FullGaussian2d(Readout):
         else:
             if self.feature_latent_flag:
                 self.feature_latent = Parameter(torch.Tensor(self.outdims, self.feature_latent_dim))
-                self.feature_mlp = nn.Linear(self.feature_latent_dim, c)
+                self.feature_mlp = nn.Sequential(
+                    nn.Linear(self.feature_latent_dim, self.feature_latent_hidden),
+                    nn.Tanh(),
+                    nn.Linear(self.feature_latent_hidden, c),
+                    # nn.Tanh(),
+                )
             else:
                 self._features = Parameter(
                     torch.Tensor(1, c, 1, self.outdims)
