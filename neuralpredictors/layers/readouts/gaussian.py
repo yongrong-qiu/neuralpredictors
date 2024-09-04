@@ -519,8 +519,12 @@ class FullGaussian2d(Readout):
             if self.feature_latent_flag:
                 self.feature_latent = Parameter(torch.Tensor(self.outdims, self.feature_latent_dim))
                 self.feature_mlp = nn.Sequential(
-                    nn.Linear(self.feature_latent_dim, self.feature_latent_hidden),
-                    nn.ReLU(), # nn.Tanh(),
+                    nn.Linear(self.feature_latent_dim, 32),
+                    nn.ReLU(), # nn.LeakyReLU() # nn.ReLU(), # nn.Tanh(), 
+                    # nn.Linear(32, 64),
+                    # nn.ReLU(), 
+                    nn.Linear(32, self.feature_latent_hidden),
+                    nn.ReLU(), 
                     nn.Linear(self.feature_latent_hidden, c),
                     # nn.Tanh(),
                 )
