@@ -255,7 +255,9 @@ class FullGaussian2d(Readout):
         source_grid (numpy.array):
                 Source grid for the grid_mean_predictor.
                 Needs to be of size neurons x grid_mean_predictor[input_dimensions]
-        feature_latent_flag: if True, then use feature_latents (low dimensions, usually 2 or 3) and map them to the feature weights for Gaussian readouts
+
+        feature_latent_flag: if True, then use feature_latents (low dimensions, usually 2 or 3) and map them to the feature weights for Gaussian readouts 
+        feature_mlp: MLP from feature_latent to feature weight for Gaussian readouts
         feature_latent_dim: dimensionality of feature latents
 
     """
@@ -279,8 +281,9 @@ class FullGaussian2d(Readout):
         gamma_readout=None,  # depricated, use feature_reg_weight instead
         return_weighted_features=False,
         feature_latent_flag=False,
+        feature_mlp=None,
         feature_latent_dim=2,
-        feature_latent_hidden=128,
+        # feature_latent_hidden=128,
         **kwargs,
     ):
 
@@ -332,8 +335,9 @@ class FullGaussian2d(Readout):
         # TODO: take care of the condition of using shared_features
         self.feature_latent_flag = feature_latent_flag
         if self.feature_latent_flag:
+            self.feature_mlp = feature_mlp
             self.feature_latent_dim = feature_latent_dim
-            self.feature_latent_hidden = feature_latent_hidden
+            # self.feature_latent_hidden = feature_latent_hidden
 
         self.initialize_features(**(shared_features or {}))
 
@@ -518,16 +522,16 @@ class FullGaussian2d(Readout):
         else:
             if self.feature_latent_flag:
                 self.feature_latent = Parameter(torch.Tensor(self.outdims, self.feature_latent_dim))
-                self.feature_mlp = nn.Sequential(
-                    nn.Linear(self.feature_latent_dim, 32),
-                    nn.ReLU(), # nn.LeakyReLU() # nn.ReLU(), # nn.Tanh(), 
-                    # nn.Linear(32, 64),
-                    # nn.ReLU(), 
-                    nn.Linear(32, self.feature_latent_hidden),
-                    nn.ReLU(), 
-                    nn.Linear(self.feature_latent_hidden, c),
-                    # nn.Tanh(),
-                )
+                # self.feature_mlp = nn.Sequential(
+                #     nn.Linear(self.feature_latent_dim, 32),
+                #     nn.ReLU(), # nn.LeakyReLU() # nn.ReLU(), # nn.Tanh(), 
+                #     # nn.Linear(32, 64),
+                #     # nn.ReLU(), 
+                #     nn.Linear(32, self.feature_latent_hidden),
+                #     nn.ReLU(), 
+                #     nn.Linear(self.feature_latent_hidden, c),
+                #     # nn.Tanh(),
+                # )
             else:
                 self._features = Parameter(
                     torch.Tensor(1, c, 1, self.outdims)
