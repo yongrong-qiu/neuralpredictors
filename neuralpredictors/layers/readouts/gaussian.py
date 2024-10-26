@@ -391,12 +391,12 @@ class FullGaussian2d(Readout):
         #     N, dim = z.shape
 
         encoding = []
-        with torch.no_grad():
-            # Loop over the frequency factors k
-            for k in range(1, max_k + 1):
-                # Apply sine and cosine along the dim axis
-                encoding.append(torch.sin(z * k * 2 * torch.pi))  # Sine for each element in the dim axis
-                encoding.append(torch.cos(z * k * 2 * torch.pi))  # Cosine for each element in the dim axis
+        # with torch.no_grad():
+        # Loop over the frequency factors k
+        for k in range(1, max_k + 1):
+            # Apply sine and cosine along the dim axis
+            encoding.append(torch.sin(z * k * 2 * torch.pi))  # Sine for each element in the dim axis
+            encoding.append(torch.cos(z * k * 2 * torch.pi))  # Cosine for each element in the dim axis
 
         # Concatenate the encodings along the `dim` axis
         pos_encoding = torch.cat(encoding, dim=-1)
