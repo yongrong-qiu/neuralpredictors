@@ -256,7 +256,7 @@ class FullGaussian2d(Readout):
                 Source grid for the grid_mean_predictor.
                 Needs to be of size neurons x grid_mean_predictor[input_dimensions]
 
-        feature_latent_flag: if True, then use feature_latents (low dimensions, usually 2 or 3) and map them to the feature weights for Gaussian readouts 
+        feature_latent_flag: if True, then use feature_latents (low dimensions, usually 2 or 3) and map them to the feature weights for Gaussian readouts
         feature_mlp: MLP from feature_latent to feature weight for Gaussian readouts
         feature_latent_dim: dimensionality of feature latents
 
@@ -284,6 +284,8 @@ class FullGaussian2d(Readout):
         feature_mlp=None,
         feature_latent_dim=2,
         # feature_latent_hidden=128,
+        position_encoding_flag=False,
+        position_encoding_k=16,
         **kwargs,
     ):
 
@@ -338,6 +340,9 @@ class FullGaussian2d(Readout):
             self.feature_mlp = feature_mlp
             self.feature_latent_dim = feature_latent_dim
             # self.feature_latent_hidden = feature_latent_hidden
+        self.position_encoding_flag = position_encoding_flag
+        if self.position_encoding_flag:
+            self.position_encoding_k = position_encoding_k
 
         self.initialize_features(**(shared_features or {}))
 
@@ -360,12 +365,53 @@ class FullGaussian2d(Readout):
     def shared_grid(self):
         return self._mu
 
+    def pos_enc_func(self, z=None):
+        """
+        Positional encoding for an N-dimensional torch tensor `z`
+        using sine and cosine functions with different frequencies `k`.
+        Args:
+
+        Returns:
+        - pos_encoding: A 1D torch tensor containing the positional encoding for each element in `z`,
+                        [sin(z_i * k * 2 * pi), cos(z_i * k * 2 * pi), ...]
+                        for each element `z_i` in `z` and k = 1, 2, ..., max_k.
+        """
+        max_k = self.position_encoding_k
+
+        if z is None:
+            z = self.feature_latent
+            z = torch.clamp(z, min=-1.0 / (2 * max_k), max=1.0 / (2 * max_k))
+            # N, dim = z.shape
+
+        # if z is None:
+        #     z = self.feature_latent
+        #     z = torch.clamp(z, min=-1.0 / (2 * max_k), max=1.0 / (2 * max_k))
+        #     N, dim = z.shape
+        # else:
+        #     N, dim = z.shape
+
+        encoding = []
+        with torch.no_grad():
+            # Loop over the frequency factors k
+            for k in range(1, max_k + 1):
+                # Apply sine and cosine along the dim axis
+                encoding.append(torch.sin(z * k * 2 * torch.pi))  # Sine for each element in the dim axis
+                encoding.append(torch.cos(z * k * 2 * torch.pi))  # Cosine for each element in the dim axis
+
+        # Concatenate the encodings along the `dim` axis
+        pos_encoding = torch.cat(encoding, dim=-1)
+
+        return pos_encoding
+
     @property
     def features(self):
         if self._shared_features:
             return self.scales * self._features[..., self.feature_sharing_index]
         elif self.feature_latent_flag:
-            return self.feature_mlp(self.feature_latent).permute(1, 0).unsqueeze(0).unsqueeze(2)
+            if self.position_encoding_flag:
+                return self.feature_mlp(self.pos_enc_func()).permute(1, 0).unsqueeze(0).unsqueeze(2)
+            else:
+                return self.feature_mlp(self.feature_latent).permute(1, 0).unsqueeze(0).unsqueeze(2)
         else:
             return self._features
 
@@ -483,6 +529,10 @@ class FullGaussian2d(Readout):
             self.sigma.data.uniform_(-self.init_sigma, self.init_sigma)
         if self.feature_latent_flag:
             self.feature_latent.data.fill_(0.0)
+            # if self.position_encoding_flag:
+            #     self.feature_latent.data.uniform_(-1.0/(2*self.position_encoding_k), 1.0/(2*self.position_encoding_k))
+            # else:
+            #     self.feature_latent.data.fill_(0.0)
         else:
             self._features.data.fill_(1 / self.in_shape[0])
         if self._shared_features:
@@ -524,11 +574,11 @@ class FullGaussian2d(Readout):
                 self.feature_latent = Parameter(torch.Tensor(self.outdims, self.feature_latent_dim))
                 # self.feature_mlp = nn.Sequential(
                 #     nn.Linear(self.feature_latent_dim, 32),
-                #     nn.ReLU(), # nn.LeakyReLU() # nn.ReLU(), # nn.Tanh(), 
+                #     nn.ReLU(), # nn.LeakyReLU() # nn.ReLU(), # nn.Tanh(),
                 #     # nn.Linear(32, 64),
-                #     # nn.ReLU(), 
+                #     # nn.ReLU(),
                 #     nn.Linear(32, self.feature_latent_hidden),
-                #     nn.ReLU(), 
+                #     nn.ReLU(),
                 #     nn.Linear(self.feature_latent_hidden, c),
                 #     # nn.Tanh(),
                 # )
